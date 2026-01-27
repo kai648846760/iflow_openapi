@@ -48,9 +48,54 @@ app.add_middleware(
 
 @app.on_event("startup")
 async def startup_event():
-    """应用启动时"""
+    """应用启动时 - 启动 iFlow 进程并初始化长期连接"""
+    import subprocess
+    import time
+    import socket
+
     print("=" * 60)
     print("正在启动 iFlow OpenAI 兼容 API 服务...")
+    print("=" * 60)
+
+    # 检查 iFlow CLI 是否已安装
+    try:
+        result = subprocess.run(["iflow", "--version"], capture_output=True, text=True)
+        if result.returncode != 0:
+            print("⚠️  iFlow CLI 未安装，请先安装 iFlow CLI")
+            print("安装命令: npm install -g iflow-cli")
+        else:
+            print(f"✅ iFlow CLI 已安装: {result.stdout.strip()}")
+    except FileNotFoundError:
+        print("⚠️  iFlow CLI 未安装，请先安装 iFlow CLI")
+        print("安装命令: npm install -g iflow-cli")
+
+    # 尝试启动 iFlow 进程
+    try:
+        # 检查端口是否已被占用
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        result = sock.connect_ex(('127.0.0.1', 8090))
+        sock.close()
+
+        if result != 0:
+            print("🚀 启动 iFlow 进程...")
+            # 启动 iFlow 进程，启用 ACP 服务
+            process = subprocess.Popen(
+                ["iflow", "--experimental-acp", "--port", "8090"],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                start_new_session=True
+            )
+            print("✅ iFlow 进程已启动（后台运行）")
+            print("⏳ 等待 iFlow 进程就绪...")
+            # 等待 5 秒，确保进程就绪
+            time.sleep(5)
+        else:
+            print("⚠️  端口 8090 已被占用，使用已有的 iFlow 进程")
+    except Exception as e:
+        print(f"⚠️  启动 iFlow 进程失败: {e}")
+        print("请手动启动: iflow --experimental-acp --port 8090")
+
+    # 服务启动完成
     print("=" * 60)
     print("✅ 服务启动完成！")
     print("接口地址: http://127.0.0.1:11666/v1")
