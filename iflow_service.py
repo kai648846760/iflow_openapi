@@ -6,6 +6,7 @@ from typing import AsyncGenerator
 
 from iflow_sdk import (
     IFlowClient,
+    IFlowOptions,
     AssistantMessage,
     TaskFinishMessage,
 )
@@ -27,8 +28,13 @@ class IFlowService:
         """初始化长期连接 - 完全按照官方文档方式"""
         if self._client is None:
             logger.info("初始化 iFlow 客户端...")
+            # 使用 IFlowOptions 配置客户端，确保自动启动 ACP 服务
+            options = IFlowOptions(
+                auto_start_process=True,  # 自动启动 iFlow 进程
+                timeout=60.0  # 增加超时时间，确保有足够时间启动 iFlow 进程
+            )
             # 按照官方文档方式：创建客户端
-            self._client = IFlowClient()
+            self._client = IFlowClient(options)
             # 按照官方文档方式：进入上下文
             await self._client.__aenter__()
             logger.info("✅ iFlow 客户端已就绪")
