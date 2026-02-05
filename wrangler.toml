@@ -1,4 +1,4 @@
-name = "iflow-loki"
+name = "iflow-openai"
 main = "worker.js"
 compatibility_date = "2026-02-05"
 
@@ -6,3 +6,7 @@ compatibility_date = "2026-02-05"
 [[kv_namespaces]]
 binding = "IFLOW_KV"
 id = "9046f1f395944e738439477f248a145e"
+
+# 定时任务：每24小时自动更新模型列表（Cron 表达式）
+[triggers]
+crons = ["0 0 * * *"]

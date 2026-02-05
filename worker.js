@@ -37,6 +37,8 @@ const KV_KEY = {
   OAUTH_REFRESH_TOKEN: "oauth_refresh_token",
   OAUTH_EXPIRES_AT: "oauth_expires_at",
   WORKER_AUTH_TOKEN: "worker_auth_token",  // Worker 访问鉴权
+  MODELS_LIST: "models_list",  // 完整模型列表（包含自动发现的新模型）
+  MODELS_UPDATED_AT: "models_updated_at",  // 模型列表最后更新时间
 };
 
 export default {
@@ -74,6 +76,12 @@ export default {
       console.error("Error:", error);
       return jsonResponse({ error: { message: error.message, type: "api_error" } }, 500);
     }
+  },
+
+  // 定时任务：每24小时自动更新模型列表
+  async scheduled(event, env, ctx) {
+    console.log("Scheduled task triggered: updating models...");
+    await updateModelsList(env, ctx);
   }
 };
 
@@ -104,7 +112,11 @@ async function handleProtectedRoute(path, request, env, ctx) {
   switch (path) {
     case "/v1/models":
     case "/models":
-      return await handleModels();
+      return await handleModels(env);
+    
+    case "/v1/models/refresh":
+    case "/models/refresh":
+      return await handleModelsRefresh(request, env, ctx);
     
     case "/v1/chat/completions":
     case "/chat/completions":
@@ -204,10 +216,23 @@ async function handleHealth(env) {
   });
 }
 
-async function handleModels() {
+async function handleModels(env) {
   const currentTime = Math.floor(Date.now() / 1000);
   
-  const models = SUPPORTED_MODELS.map(model => ({
+  // 优先从 KV 读取完整模型列表
+  let modelsList = SUPPORTED_MODELS;
+  if (env) {
+    try {
+      const storedModels = await env.IFLOW_KV.get(KV_KEY.MODELS_LIST);
+      if (storedModels) {
+        modelsList = JSON.parse(storedModels);
+      }
+    } catch (error) {
+      console.error("Error loading models from KV:", error);
+    }
+  }
+  
+  const models = modelsList.map(model => ({
     id: model.id,
     object: "model",
     created: currentTime,
@@ -221,6 +246,23 @@ async function handleModels() {
     object: "list",
     data: models,
   });
+}
+
+async function handleModelsRefresh(request, env, ctx) {
+  if (request.method !== "POST") {
+    return jsonResponse({ error: "Method not allowed" }, 405);
+  }
+
+  try {
+    // 触发模型列表更新
+    await updateModelsList(env, ctx);
+    
+    // 返回更新后的模型列表
+    return await handleModels(env);
+    
+  } catch (error) {
+    return jsonResponse({ error: { message: `Failed to refresh models: ${error.message}` } }, 500);
+  }
 }
 
 async function handleChatCompletions(request, env, ctx) {
@@ -710,4 +752,78 @@ function generateRandomString(length) {
   return Array.from(crypto.getRandomValues(new Uint8Array(length)))
     .map(x => chars[x % chars.length])
     .join("");
+}
+
+// ============================================
+// 模型列表自动更新
+// ============================================
+
+async function updateModelsList(env, ctx) {
+  /**
+   * 从 iFlow API 获取最新模型列表，并与 SUPPORTED_MODELS 合并
+   * 保存到 KV 中供后续使用
+   */
+  try {
+    // 1. 加载 iFlow 配置
+    const config = await loadIFlowConfig(env);
+    if (!config?.api_key) {
+      console.log("iFlow not logged in, skipping models update");
+      return;
+    }
+
+    // 2. 请求 iFlow /v1/models 接口
+    const response = await fetch(`${config.base_url}/models`, {
+      headers: {
+        "Authorization": `Bearer ${config.api_key}`,
+        "User-Agent": IFLOW_CONFIG.USER_AGENT,
+      },
+    });
+
+    if (!response.ok) {
+      console.error(`Failed to fetch models: ${response.status}`);
+      return;
+    }
+
+    const result = await response.json();
+    if (!result.data || !Array.isArray(result.data)) {
+      console.error("Invalid models response format");
+      return;
+    }
+
+    // 3. 提取 iFlow 返回的模型 ID
+    const iflowModelIds = new Set(result.data.map(m => m.id));
+
+    // 4. 检查是否有新模型（不在 SUPPORTED_MODELS 中）
+    const newModels = [];
+    for (const modelId of iflowModelIds) {
+      const exists = SUPPORTED_MODELS.some(m => m.id === modelId);
+      if (!exists) {
+        newModels.push({
+          id: modelId,
+          name: modelId,
+          description: "自动发现的新模型",
+        });
+      }
+    }
+
+    // 5. 合并模型列表（SUPPORTED_MODELS 在前，新模型在后）
+    const mergedModels = [...SUPPORTED_MODELS, ...newModels];
+
+    // 6. 保存到 KV
+    const modelsJson = JSON.stringify(mergedModels);
+    const timestamp = Date.now();
+
+    if (ctx && ctx.waitUntil) {
+      ctx.waitUntil(env.IFLOW_KV.put(KV_KEY.MODELS_LIST, modelsJson));
+      ctx.waitUntil(env.IFLOW_KV.put(KV_KEY.MODELS_UPDATED_AT, timestamp.toString()));
+    } else {
+      await env.IFLOW_KV.put(KV_KEY.MODELS_LIST, modelsJson);
+      await env.IFLOW_KV.put(KV_KEY.MODELS_UPDATED_AT, timestamp.toString());
+    }
+
+    console.log(`Models list updated: ${mergedModels.length} total models (${newModels.length} new)`);
+    
+  } catch (error) {
+    console.error("Error updating models list:", error);
+  }
 }

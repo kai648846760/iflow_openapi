@@ -128,6 +128,20 @@ curl https://你的WorkerURL/v1/models \
   -H "Authorization: Bearer <你的Worker访问Token>"
 ```
 
+#### 手动刷新模型列表
+
+当 iFlow 发布新模型时，你可以手动触发刷新：
+
+```bash
+curl -X POST https://你的WorkerURL/v1/models/refresh \
+  -H "Authorization: Bearer <你的Worker访问Token>"
+```
+
+这个接口会：
+1. 调用 iFlow API 获取最新模型列表
+2. 自动检测并添加新模型
+3. 返回更新后的完整模型列表
+
 #### 聊天对话（非流式）
 
 ```bash
@@ -204,6 +218,7 @@ print(response.choices[0].message.content)
 | `/oauth/login` | GET | OAuth 登录入口 | ❌ |
 | `/oauth/callback` | GET | OAuth 回调 | ❌ |
 | `/v1/models` | GET | 获取模型列表 | ✅ |
+| `/v1/models/refresh` | POST | 手动刷新模型列表 | ✅ |
 | `/v1/chat/completions` | POST | 聊天对话 | ✅ |
 
 ## 错误处理
