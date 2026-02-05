@@ -1,0 +1,8 @@
+name = "iflow-openai"
+main = "worker.js"
+compatibility_date = "2026-02-05"
+
+# KV 命名空间绑定（需要在 Cloudflare 后台创建）
+# [[kv_namespaces]]
+# binding = "KV"
+# id = "your-kv-namespace-id"
