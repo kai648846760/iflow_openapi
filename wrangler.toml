@@ -2,7 +2,7 @@ name = "iflow-loki"
 main = "worker.js"
 compatibility_date = "2026-02-05"
 
-# KV 命名空间绑定（需要在 Cloudflare 后台创建）
-# [[kv_namespaces]]
-# binding = "KV"
-# id = "your-kv-namespace-id"
+# KV 命名空间绑定
+[[kv_namespaces]]
+binding = "IFLOW_KV"
+id = "9046f1f395944e738439477f248a145e"
