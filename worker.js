@@ -78,10 +78,22 @@ export default {
     }
   },
 
-  // 定时任务：每24小时自动更新模型列表
+  // 定时任务：每15分钟刷新token，每24小时自动更新模型列表
   async scheduled(event, env, ctx) {
-    console.log("Scheduled task triggered: updating models...");
-    await updateModelsList(env, ctx);
+    const cron = event.cron;
+    console.log(`Scheduled task triggered: ${cron}`);
+    
+    // 每天0点（24小时）更新模型列表
+    if (cron === "0 0 * * *") {
+      console.log("Updating models list...");
+      await updateModelsList(env, ctx);
+    }
+    
+    // 每15分钟检查并刷新 token
+    if (cron === "*/15 * * * *") {
+      console.log("Checking and refreshing OAuth token...");
+      await refreshOAuthTokenIfNeeded(env, ctx);
+    }
   }
 };
 
@@ -752,6 +764,79 @@ function generateRandomString(length) {
   return Array.from(crypto.getRandomValues(new Uint8Array(length)))
     .map(x => chars[x % chars.length])
     .join("");
+}
+
+// ============================================
+// OAuth Token 定时刷新
+// ============================================
+
+async function refreshOAuthTokenIfNeeded(env, ctx) {
+  /**
+   * 定时任务：检查并刷新即将过期的 OAuth token
+   * 如果 token 还有超过 5 分钟才过期，则不刷新
+   */
+  try {
+    const config = await loadIFlowConfig(env);
+    
+    // 如果不是 OAuth 认证或没有 refresh token，跳过
+    if (!config || config.auth_type !== "oauth-iflow" || !config.oauth_refresh_token) {
+      return;
+    }
+
+    // 如果没有过期时间，跳过
+    if (!config.oauth_expires_at) {
+      return;
+    }
+
+    // 提前 5 分钟刷新 (300 秒 = 300000 毫秒)
+    const bufferMs = 5 * 60 * 1000;
+    const now = Date.now();
+
+    // Token 还有超过 5 分钟才过期，无需刷新
+    if (now < (config.oauth_expires_at - bufferMs)) {
+      console.log(`Token still valid, expires at ${new Date(config.oauth_expires_at).toISOString()}`);
+      return;
+    }
+
+    console.log(`Token expiring at ${new Date(config.oauth_expires_at).toISOString()}, refreshing...`);
+    
+    // 调用刷新接口
+    const newToken = await refreshToken(config.oauth_refresh_token);
+    
+    // 获取新用户信息（可能包含新的 apiKey）
+    let apiKey = config.api_key;
+    try {
+      const userInfo = await getUserInfo(newToken.access_token);
+      if (userInfo.apiKey) {
+        apiKey = userInfo.apiKey;
+        console.log("Got new apiKey from user info");
+      }
+    } catch (e) {
+      console.warn("Could not fetch user info during refresh, keeping old apiKey:", e.message);
+    }
+
+    // 构建新配置对象
+    const newConfig = {
+      ...config,
+      api_key: apiKey,
+      oauth_access_token: newToken.access_token,
+      oauth_refresh_token: newToken.refresh_token,
+      oauth_expires_at: newToken.expires_at,
+    };
+
+    // 保存到 KV
+    if (ctx && ctx.waitUntil) {
+      ctx.waitUntil(saveIFlowConfig(env, newConfig));
+    } else {
+      await saveIFlowConfig(env, newConfig);
+    }
+
+    console.log(`Token refreshed successfully, new expiry: ${new Date(newConfig.oauth_expires_at).toISOString()}`);
+    
+  } catch (error) {
+    console.error("Error refreshing OAuth token in scheduled task:", error);
+    // 定时任务中不抛出错误，避免中断任务
+  }
 }
 
 // ============================================
