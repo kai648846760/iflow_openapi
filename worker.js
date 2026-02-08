@@ -17,7 +17,8 @@ const IFLOW_CONFIG = {
 
 // 支持的模型列表 (来源于 iflow-cli SUPPORTED_MODELS)
 const SUPPORTED_MODELS = [
-  { id: "glm-4.7", name: "GLM-4.7", description: "智谱 GLM-4.7 (推荐)" },
+  { id: "glm-4.7", name: "GLM-4.7", description: "智谱 GLM-4.7 " },
+  { id: "kimi-k2.5", name: "Kimi-K2.5", description: "月之暗面 Kimi K2.5" },
   { id: "iFlow-ROME-30BA3B", name: "iFlow-ROME-30BA3B", description: "iFlow ROME 30B (快速)" },
   { id: "deepseek-v3.2-chat", name: "DeepSeek-V3.2", description: "DeepSeek V3.2 对话模型" },
   { id: "qwen3-coder-plus", name: "Qwen3-Coder-Plus", description: "通义千问 Qwen3 Coder Plus" },
