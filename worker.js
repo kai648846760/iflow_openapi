@@ -232,13 +232,21 @@ async function handleHealth(env) {
 async function handleModels(env) {
   const currentTime = Math.floor(Date.now() / 1000);
   
-  // 优先从 KV 读取完整模型列表
-  let modelsList = SUPPORTED_MODELS;
+  // 始终以 SUPPORTED_MODELS 为基础（确保代码更新的模型一定显示）
+  let modelsList = [...SUPPORTED_MODELS];
+  
   if (env) {
     try {
       const storedModels = await env.IFLOW_KV.get(KV_KEY.MODELS_LIST);
       if (storedModels) {
-        modelsList = JSON.parse(storedModels);
+        const parsedStored = JSON.parse(storedModels);
+        // 只添加 SUPPORTED_MODELS 中没有的新模型
+        const existingIds = new Set(modelsList.map(m => m.id));
+        for (const model of parsedStored) {
+          if (!existingIds.has(model.id)) {
+            modelsList.push(model);
+          }
+        }
       }
     } catch (error) {
       console.error("Error loading models from KV:", error);
