@@ -927,14 +927,14 @@ async function updateModelsList(env, ctx) {
 
     // 6. 保存到 KV
     const modelsJson = JSON.stringify(mergedModels);
-    const timestamp = Date.now();
+    const updateTimestamp = Date.now();
 
     if (ctx && ctx.waitUntil) {
       ctx.waitUntil(env.IFLOW_KV.put(KV_KEY.MODELS_LIST, modelsJson));
-      ctx.waitUntil(env.IFLOW_KV.put(KV_KEY.MODELS_UPDATED_AT, timestamp.toString()));
+      ctx.waitUntil(env.IFLOW_KV.put(KV_KEY.MODELS_UPDATED_AT, updateTimestamp.toString()));
     } else {
       await env.IFLOW_KV.put(KV_KEY.MODELS_LIST, modelsJson);
-      await env.IFLOW_KV.put(KV_KEY.MODELS_UPDATED_AT, timestamp.toString());
+      await env.IFLOW_KV.put(KV_KEY.MODELS_UPDATED_AT, updateTimestamp.toString());
     }
 
     console.log(`Models list updated: ${mergedModels.length} total models (${newModels.length} new)`);
