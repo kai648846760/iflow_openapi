@@ -328,10 +328,22 @@ async function handleChatCompletions(request, env, ctx) {
   // 转发请求到 iFlow API 
   try {
     const targetUrl = `${config.base_url}/chat/completions`;
+    
+    // 添加请求标识符,伪装成 iflow CLI
+    const requestId = crypto.randomUUID();
+    const timestamp = Date.now();
+    
     const headers = {
       "Content-Type": "application/json",
       "Authorization": `Bearer ${config.api_key}`,
       "User-Agent": IFLOW_CONFIG.USER_AGENT,
+      // 添加额外的请求头来伪装成 iflow CLI
+      "X-Client-Version": "1.0.0",
+      "X-Request-Id": requestId,
+      "X-Client-Id": IFLOW_CONFIG.CLIENT_ID,
+      "Accept": "application/json",
+      "X-Platform": "cli",
+      "X-Timestamp": timestamp.toString(),
     };
 
     const response = await fetch(targetUrl, {
@@ -866,10 +878,20 @@ async function updateModelsList(env, ctx) {
     }
 
     // 2. 请求 iFlow /v1/models 接口
+    const requestId = crypto.randomUUID();
+    const timestamp = Date.now();
+    
     const response = await fetch(`${config.base_url}/models`, {
       headers: {
         "Authorization": `Bearer ${config.api_key}`,
         "User-Agent": IFLOW_CONFIG.USER_AGENT,
+        // 添加额外的请求头来伪装成 iflow CLI
+        "X-Client-Version": "1.0.0",
+        "X-Request-Id": requestId,
+        "X-Client-Id": IFLOW_CONFIG.CLIENT_ID,
+        "Accept": "application/json",
+        "X-Platform": "cli",
+        "X-Timestamp": timestamp.toString(),
       },
     });
 
