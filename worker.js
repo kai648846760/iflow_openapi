@@ -368,12 +368,12 @@ async function handleChatCompletions(request, env, ctx) {
   try {
     const targetUrl = `${config.base_url}/chat/completions`;
     
-    // 生成时间戳(13位,与 iflow CLI 格式一致)
-    const timestamp = Date.now();
-    
     // 生成 session-id 和 conversation-id
     const sessionId = `session-${crypto.randomUUID()}`;
     const conversationId = crypto.randomUUID();
+    
+    // 生成时间戳(13位毫秒时间戳,格式: 1770625160066)
+    const timestamp = Date.now();
     
     // 生成 x-iflow-signature
     const signature = await generateIFlowSignature(timestamp.toString(), sessionId, conversationId);
@@ -388,7 +388,7 @@ async function handleChatCompletions(request, env, ctx) {
     // 序列化请求体以计算 content-length
     const bodyString = JSON.stringify(body);
     
-    // 完全匹配 iflow CLI 的请求头格式
+    // 完全匹配抓包得到的 iflow CLI 请求头格式
     const headers = {
       "host": "apis.iflow.cn",
       "connection": "keep-alive",
@@ -937,12 +937,13 @@ async function updateModelsList(env, ctx) {
       return;
     }
 
-    // 2. 请求 iFlow /v1/models 接口
-    const timestamp = Date.now();
-    
+// 2. 请求 iFlow /v1/models 接口
     // 生成 session-id 和 conversation-id
     const sessionId = `session-${crypto.randomUUID()}`;
     const conversationId = crypto.randomUUID();
+    
+    // 生成时间戳(13位毫秒时间戳)
+    const timestamp = Date.now();
     
     // 生成 x-iflow-signature
     const signature = await generateIFlowSignature(timestamp.toString(), sessionId, conversationId);
@@ -968,6 +969,7 @@ async function updateModelsList(env, ctx) {
         "accept": "*/*",
         "accept-language": "*",
         "sec-fetch-mode": "cors",
+        "Content-Type": "application/json",
       },
     });
 
