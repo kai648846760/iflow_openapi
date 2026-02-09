@@ -430,9 +430,8 @@ async function handleChatCompletions(request, env, ctx) {
     const bodyString = JSON.stringify(body);
 
     // 完全匹配抓包得到的 iflow CLI 请求头格式
+    // 注意: Cloudflare Workers 会自动处理 host, connection, content-length 等 header
     const headers = {
-      "host": "apis.iflow.cn",
-      "connection": "keep-alive",
       "Authorization": `Bearer ${config.api_key}`,
       "user-agent": "iFlow-Cli",
       "session-id": sessionId,
@@ -443,7 +442,6 @@ async function handleChatCompletions(request, env, ctx) {
       "accept": "*/*",
       "accept-language": "*",
       "sec-fetch-mode": "cors",
-      "content-length": bodyString.length.toString(),
       "Content-Type": "application/json",
     };
 
@@ -998,8 +996,6 @@ async function updateModelsList(env, ctx) {
     
     const response = await fetch(`${config.base_url}/models`, {
       headers: {
-        "host": "apis.iflow.cn",
-        "connection": "keep-alive",
         "Authorization": `Bearer ${config.api_key}`,
         "user-agent": "iFlow-Cli",
         "session-id": sessionId,
