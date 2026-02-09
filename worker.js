@@ -409,23 +409,15 @@ async function handleChatCompletions(request, env, ctx) {
   try {
     const targetUrl = `${config.base_url}/chat/completions`;
     
-    // 生成 session-id 和 conversation-id
+    // 生成 session-id
     const sessionId = `session-${crypto.randomUUID()}`;
-    const conversationId = crypto.randomUUID();
 
     // 生成时间戳(13位毫秒时间戳,格式: 1770625160066)
     const timestamp = Date.now();
 
     // 生成 x-iflow-signature (格式: {userAgent}:{sessionId}:{timestamp})
     const signature = await generateIFlowSignature(timestamp.toString(), sessionId, config.api_key);
-    
-    // 生成 traceparent (格式: 00-{trace-id}-{parent-id}-{flags})
-    const traceId = Array.from(crypto.getRandomValues(new Uint8Array(16)))
-      .map(b => b.toString(16).padStart(2, '0')).join('');
-    const parentId = Array.from(crypto.getRandomValues(new Uint8Array(8)))
-      .map(b => b.toString(16).padStart(2, '0')).join('');
-    const traceparent = `00-${traceId}-${parentId}-01`;
-    
+
     // 序列化请求体以计算 content-length
     const bodyString = JSON.stringify(body);
 
@@ -435,11 +427,9 @@ async function handleChatCompletions(request, env, ctx) {
       "Authorization": `Bearer ${config.api_key}`,
       "user-agent": "iFlow-Cli",
       "session-id": sessionId,
-      "conversation-id": conversationId,
       "x-iflow-signature": signature,
       "x-iflow-timestamp": timestamp.toString(),
-      "traceparent": traceparent,
-      "accept": isStream ? "text/event-stream" : "*/*",
+      "accept": "*/*",
       "accept-language": "*",
       "sec-fetch-mode": "cors",
       "Content-Type": "application/json",
@@ -979,31 +969,21 @@ async function updateModelsList(env, ctx) {
 // 2. 请求 iFlow /v1/models 接口
     // 生成 session-id 和 conversation-id
     const sessionId = `session-${crypto.randomUUID()}`;
-    const conversationId = crypto.randomUUID();
 
     // 生成时间戳(13位毫秒时间戳)
     const timestamp = Date.now();
 
     // 生成 x-iflow-signature (格式: {userAgent}:{sessionId}:{timestamp})
     const signature = await generateIFlowSignature(timestamp.toString(), sessionId, config.api_key);
-    
-    // 生成 traceparent (格式: 00-{trace-id}-{parent-id}-{flags})
-    const traceId = Array.from(crypto.getRandomValues(new Uint8Array(16)))
-      .map(b => b.toString(16).padStart(2, '0')).join('');
-    const parentId = Array.from(crypto.getRandomValues(new Uint8Array(8)))
-      .map(b => b.toString(16).padStart(2, '0')).join('');
-    const traceparent = `00-${traceId}-${parentId}-01`;
-    
+
     const response = await fetch(`${config.base_url}/models`, {
       headers: {
         "Authorization": `Bearer ${config.api_key}`,
         "user-agent": "iFlow-Cli",
         "session-id": sessionId,
-        "conversation-id": conversationId,
         "x-iflow-signature": signature,
         "x-iflow-timestamp": timestamp.toString(),
-        "traceparent": traceparent,
-        "accept": "application/json",
+        "accept": "*/*",
         "accept-language": "*",
         "sec-fetch-mode": "cors",
         "Content-Type": "application/json",
