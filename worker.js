@@ -42,6 +42,45 @@ const KV_KEY = {
   MODELS_UPDATED_AT: "models_updated_at",  // 模型列表最后更新时间
 };
 
+/**
+ * 生成 iFlow API 签名 (x-iflow-signature)
+ * 使用 HMAC-SHA256 算法
+ * 
+ * @param {string} timestamp - 时间戳
+ * @param {string} sessionId - 会话 ID
+ * @param {string} conversationId - 对话 ID
+ * @returns {string} 十六进制格式的签名
+ */
+async function generateIFlowSignature(timestamp, sessionId, conversationId) {
+  // 将 key 转换为 ArrayBuffer
+  const keyData = new TextEncoder().encode(IFLOW_CONFIG.CLIENT_SECRET);
+  const key = await crypto.subtle.importKey(
+    "raw",
+    keyData,
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+
+  // 构建签名数据 (根据 iflow-cli 的签名规则)
+  // 格式: timestamp + sessionId + conversationId
+  const message = `${timestamp}${sessionId}${conversationId}`;
+  const messageData = new TextEncoder().encode(message);
+
+  // 生成 HMAC-SHA256 签名
+  const signature = await crypto.subtle.sign(
+    "HMAC",
+    key,
+    messageData
+  );
+
+  // 转换为十六进制字符串
+  const signatureArray = Array.from(new Uint8Array(signature));
+  const signatureHex = signatureArray.map(b => b.toString(16).padStart(2, '0')).join('');
+
+  return signatureHex;
+}
+
 export default {
   async fetch(request, env, ctx) {
     // CORS 预检
@@ -329,21 +368,42 @@ async function handleChatCompletions(request, env, ctx) {
   try {
     const targetUrl = `${config.base_url}/chat/completions`;
     
-    // 添加请求标识符,伪装成 iflow CLI
-    const requestId = crypto.randomUUID();
+    // 生成时间戳(13位,与 iflow CLI 格式一致)
     const timestamp = Date.now();
     
+    // 生成 session-id 和 conversation-id
+    const sessionId = `session-${crypto.randomUUID()}`;
+    const conversationId = crypto.randomUUID();
+    
+    // 生成 x-iflow-signature
+    const signature = await generateIFlowSignature(timestamp.toString(), sessionId, conversationId);
+    
+    // 生成 traceparent (格式: 00-{trace-id}-{parent-id}-{flags})
+    const traceId = Array.from(crypto.getRandomValues(new Uint8Array(16)))
+      .map(b => b.toString(16).padStart(2, '0')).join('');
+    const parentId = Array.from(crypto.getRandomValues(new Uint8Array(8)))
+      .map(b => b.toString(16).padStart(2, '0')).join('');
+    const traceparent = `00-${traceId}-${parentId}-01`;
+    
+    // 序列化请求体以计算 content-length
+    const bodyString = JSON.stringify(body);
+    
+    // 完全匹配 iflow CLI 的请求头格式
     const headers = {
-      "Content-Type": "application/json",
+      "host": "apis.iflow.cn",
+      "connection": "keep-alive",
       "Authorization": `Bearer ${config.api_key}`,
-      "User-Agent": IFLOW_CONFIG.USER_AGENT,
-      // 添加额外的请求头来伪装成 iflow CLI
-      "X-Client-Version": "1.0.0",
-      "X-Request-Id": requestId,
-      "X-Client-Id": IFLOW_CONFIG.CLIENT_ID,
-      "Accept": "application/json",
-      "X-Platform": "cli",
-      "X-Timestamp": timestamp.toString(),
+      "user-agent": "iFlow-Cli",
+      "session-id": sessionId,
+      "conversation-id": conversationId,
+      "x-iflow-signature": signature,
+      "x-iflow-timestamp": timestamp.toString(),
+      "traceparent": traceparent,
+      "accept": "*/*",
+      "accept-language": "*",
+      "sec-fetch-mode": "cors",
+      "content-length": bodyString.length.toString(),
+      "Content-Type": "application/json",
     };
 
     const response = await fetch(targetUrl, {
@@ -878,20 +938,36 @@ async function updateModelsList(env, ctx) {
     }
 
     // 2. 请求 iFlow /v1/models 接口
-    const requestId = crypto.randomUUID();
     const timestamp = Date.now();
+    
+    // 生成 session-id 和 conversation-id
+    const sessionId = `session-${crypto.randomUUID()}`;
+    const conversationId = crypto.randomUUID();
+    
+    // 生成 x-iflow-signature
+    const signature = await generateIFlowSignature(timestamp.toString(), sessionId, conversationId);
+    
+    // 生成 traceparent (格式: 00-{trace-id}-{parent-id}-{flags})
+    const traceId = Array.from(crypto.getRandomValues(new Uint8Array(16)))
+      .map(b => b.toString(16).padStart(2, '0')).join('');
+    const parentId = Array.from(crypto.getRandomValues(new Uint8Array(8)))
+      .map(b => b.toString(16).padStart(2, '0')).join('');
+    const traceparent = `00-${traceId}-${parentId}-01`;
     
     const response = await fetch(`${config.base_url}/models`, {
       headers: {
+        "host": "apis.iflow.cn",
+        "connection": "keep-alive",
         "Authorization": `Bearer ${config.api_key}`,
-        "User-Agent": IFLOW_CONFIG.USER_AGENT,
-        // 添加额外的请求头来伪装成 iflow CLI
-        "X-Client-Version": "1.0.0",
-        "X-Request-Id": requestId,
-        "X-Client-Id": IFLOW_CONFIG.CLIENT_ID,
-        "Accept": "application/json",
-        "X-Platform": "cli",
-        "X-Timestamp": timestamp.toString(),
+        "user-agent": "iFlow-Cli",
+        "session-id": sessionId,
+        "conversation-id": conversationId,
+        "x-iflow-signature": signature,
+        "x-iflow-timestamp": timestamp.toString(),
+        "traceparent": traceparent,
+        "accept": "*/*",
+        "accept-language": "*",
+        "sec-fetch-mode": "cors",
       },
     });
 
