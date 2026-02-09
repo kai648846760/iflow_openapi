@@ -428,7 +428,7 @@ async function handleChatCompletions(request, env, ctx) {
     
     // 序列化请求体以计算 content-length
     const bodyString = JSON.stringify(body);
-    
+
     // 完全匹配抓包得到的 iflow CLI 请求头格式
     const headers = {
       "host": "apis.iflow.cn",
@@ -450,7 +450,7 @@ async function handleChatCompletions(request, env, ctx) {
     const response = await fetch(targetUrl, {
       method: "POST",
       headers: headers,
-      body: JSON.stringify(body),
+      body: bodyString,
     });
 
     if (!response.ok) {
