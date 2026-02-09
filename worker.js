@@ -43,42 +43,83 @@ const KV_KEY = {
 };
 
 /**
+
  * 生成 iFlow API 签名 (x-iflow-signature)
+
  * 使用 HMAC-SHA256 算法
+
  * 
+
  * @param {string} timestamp - 时间戳
+
  * @param {string} sessionId - 会话 ID
- * @param {string} conversationId - 对话 ID
+
+ * @param {string} apiKey - API Key
+
  * @returns {string} 十六进制格式的签名
+
  */
-async function generateIFlowSignature(timestamp, sessionId, conversationId) {
-  // 将 key 转换为 ArrayBuffer
-  const keyData = new TextEncoder().encode(IFLOW_CONFIG.CLIENT_SECRET);
+
+async function generateIFlowSignature(timestamp, sessionId, apiKey) {
+
+  // 使用 API Key 作为 HMAC 密钥
+
+  const keyData = new TextEncoder().encode(apiKey);
+
   const key = await crypto.subtle.importKey(
+
     "raw",
+
     keyData,
+
     { name: "HMAC", hash: "SHA-256" },
+
     false,
+
     ["sign"]
+
   );
 
-  // 构建签名数据 (根据 iflow-cli 的签名规则)
-  // 格式: timestamp + sessionId + conversationId
-  const message = `${timestamp}${sessionId}${conversationId}`;
+
+
+  // 构建签名数据: {userAgent}:{sessionId}:{timestamp}
+
+  const userAgent = "iFlow-Cli";
+
+  const message = `${userAgent}:${sessionId}:${timestamp}`;
+
   const messageData = new TextEncoder().encode(message);
 
+
+
   // 生成 HMAC-SHA256 签名
+
   const signature = await crypto.subtle.sign(
+
     "HMAC",
+
     key,
+
     messageData
+
   );
 
+
+
   // 转换为十六进制字符串
+
   const signatureArray = Array.from(new Uint8Array(signature));
-  const signatureHex = signatureArray.map(b => b.toString(16).padStart(2, '0')).join('');
+
+  const signatureHex = signatureArray
+
+    .map(b => b.toString(16).padStart(2, '0'))
+
+    .join('');
+
+
 
   return signatureHex;
+
 }
 
 export default {
@@ -371,12 +412,12 @@ async function handleChatCompletions(request, env, ctx) {
     // 生成 session-id 和 conversation-id
     const sessionId = `session-${crypto.randomUUID()}`;
     const conversationId = crypto.randomUUID();
-    
+
     // 生成时间戳(13位毫秒时间戳,格式: 1770625160066)
     const timestamp = Date.now();
-    
-    // 生成 x-iflow-signature
-    const signature = await generateIFlowSignature(timestamp.toString(), sessionId, conversationId);
+
+    // 生成 x-iflow-signature (格式: {userAgent}:{sessionId}:{timestamp})
+    const signature = await generateIFlowSignature(timestamp.toString(), sessionId, config.api_key);
     
     // 生成 traceparent (格式: 00-{trace-id}-{parent-id}-{flags})
     const traceId = Array.from(crypto.getRandomValues(new Uint8Array(16)))
@@ -941,12 +982,12 @@ async function updateModelsList(env, ctx) {
     // 生成 session-id 和 conversation-id
     const sessionId = `session-${crypto.randomUUID()}`;
     const conversationId = crypto.randomUUID();
-    
+
     // 生成时间戳(13位毫秒时间戳)
     const timestamp = Date.now();
-    
-    // 生成 x-iflow-signature
-    const signature = await generateIFlowSignature(timestamp.toString(), sessionId, conversationId);
+
+    // 生成 x-iflow-signature (格式: {userAgent}:{sessionId}:{timestamp})
+    const signature = await generateIFlowSignature(timestamp.toString(), sessionId, config.api_key);
     
     // 生成 traceparent (格式: 00-{trace-id}-{parent-id}-{flags})
     const traceId = Array.from(crypto.getRandomValues(new Uint8Array(16)))
