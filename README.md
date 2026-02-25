@@ -1,7 +1,9 @@
-# iFlow OpenAI API
+# iFlow OpenAI API【停止维护】
 
 将 iFlow CLI 的 AI 服务转换为 OpenAI 兼容 API，部署在 Cloudflare Workers 上。
 
+> ⚠️ **声明：该项目仅用于学习使用，不得用于任何商业用途。**
+> ⚠️ **声明：该项目仅用于学习使用，不得用于任何商业用途。**
 > ⚠️ **声明：该项目仅用于学习使用，不得用于任何商业用途。**
 
 ## 功能特性
